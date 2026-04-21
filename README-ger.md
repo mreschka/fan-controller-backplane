@@ -202,3 +202,15 @@ Normales Log-Format:
 - **nvidia-settings**: Nur für Desktop-GPUs mit eigenem Lüfter; Tesla P100 hat keinen
 
 Der Arduino-basierte Ansatz ist die einzige praktikable Lösung für Rechenkarten ohne eigene Kühlung an einem selbstgebauten Kühlrahmen.
+
+## License
+
+Copyright (c) 2026 Markus Reschka
+
+This project is licensed under the **Polyform Noncommercial License 1.0.0**.  
+Free to use, modify and distribute for **non-commercial purposes** only.  
+See [LICENSE](LICENSE) for details.
+
+## Author
+
+Built with the help of GitHub Copilot.
