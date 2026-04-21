@@ -1,0 +1,32 @@
+# GPU Fan Controller – Konfiguration
+# Installationspfad: /etc/gpu-fan-control.toml
+# Nach Änderungen: sudo systemctl restart gpu-fan-control.service
+
+[global]
+update_interval        = 2.0   # Sekunden zwischen Regelzyklen
+min_rpm_warn_threshold = 300   # RPM-Untergrenze für Lüfterausfall-Alarm
+rpm_fail_debounce      = 5.0   # Sekunden Stillstand bevor Alarm ausgelöst wird
+fallback_speed         = 40    # % Lüfterdrehzahl wenn nvidia-smi nicht verfügbar
+admin_email            = "root"
+
+# PID-Standardwerte – gelten für alle Zonen, sofern dort nicht überschrieben
+[pid_defaults]
+setpoint  = 75    # Zieltemperatur in °C
+kp        = 2.5   # Proportionalanteil
+ki        = 0.08  # Integralanteil (pro Sekunde)
+kd        = 4.0   # Differentialanteil
+min_speed = 5     # Minimale Lüfterdrehzahl in % (<5% = Silent-Mode bei Arctic P9 Max)
+max_speed = 60    # Maximale Lüfterdrehzahl in % (>60% = störende Gehäuseresonanz)
+max_slew  = 5     # Maximale Änderung pro Regelzyklus in % (sanfter Anlauf)
+
+# Jeder [[controllers]]-Block definiert eine Regelzone mit eigenem Arduino.
+# Mehrere Blöcke möglich (z.B. für separate Gehäuse).
+[[controllers]]
+name          = "Haupt-Zone (4x P100)"
+port          = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A501S5OJ-if00-port0"
+gpus          = [0, 1, 2, 3]   # nvidia-smi GPU-Indizes dieser Zone
+active_tachos = [0, 1, 2]      # Tacho-Ports mit angesteckten Lüftern (Index = Arduino Pin - 2)
+
+# Optionale PID-Overrides für diese Zone (überschreiben pid_defaults):
+# setpoint  = 80
+# min_speed = 10

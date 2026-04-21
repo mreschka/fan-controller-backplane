@@ -1,0 +1,17 @@
+[Unit]
+Description=GPU Fan Controller (Arduino PID)
+After=network.target
+
+[Service]
+Type=simple
+User=markus
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/gpu-fan-control/gpu_fan_control_advanced.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=GPU-FAN-CTRL
+
+[Install]
+WantedBy=multi-user.target
