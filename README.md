@@ -132,6 +132,7 @@ min_rpm_warn_threshold = 300    # RPM threshold for fan failure alarm
 rpm_fail_debounce      = 5.0    # seconds of low RPM before alarm fires
 fallback_speed         = 40     # % speed when nvidia-smi is unavailable
 admin_email            = "root"
+error_mail_interval    = 86400  # seconds between identical error mails (86400 = 24h)
 
 [pid_defaults]
 setpoint  = 75    # target temperature in °C

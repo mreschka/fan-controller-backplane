@@ -13,7 +13,9 @@ MIN_RPM_WARN_THRESHOLD = None
 RPM_FAIL_DEBOUNCE      = None
 FALLBACK_SPEED         = None
 ADMIN_EMAIL            = None
+ERROR_MAIL_INTERVAL    = None
 CONTROLLERS            = []
+ERROR_MAIL_STATE       = {}
 
 
 class PIDController:
@@ -65,7 +67,7 @@ class PIDController:
 def load_config():
     """Lädt /etc/gpu-fan-control.toml und setzt alle globalen Konfigurationsvariablen."""
     global UPDATE_INTERVAL, MIN_RPM_WARN_THRESHOLD, RPM_FAIL_DEBOUNCE
-    global FALLBACK_SPEED, ADMIN_EMAIL, CONTROLLERS
+    global FALLBACK_SPEED, ADMIN_EMAIL, ERROR_MAIL_INTERVAL, CONTROLLERS
 
     try:
         with open(CONFIG_PATH, "rb") as f:
@@ -83,6 +85,7 @@ def load_config():
     RPM_FAIL_DEBOUNCE      = g.get("rpm_fail_debounce",      5.0)
     FALLBACK_SPEED         = g.get("fallback_speed",         40)
     ADMIN_EMAIL            = g.get("admin_email",            "root")
+    ERROR_MAIL_INTERVAL    = g.get("error_mail_interval",    86400)
 
     pid_defs = cfg.get("pid_defaults", {})
 
@@ -109,7 +112,7 @@ def load_config():
         })
 
 
-def log_and_mail(subject, message, is_error=True):
+def log_and_mail(subject, message, is_error=True, throttle_key=None, throttle_seconds=None):
     print(f"[{'ERROR' if is_error else 'INFO'}] {subject} - {message}")
     
     if is_error:
@@ -118,9 +121,30 @@ def log_and_mail(subject, message, is_error=True):
         syslog.syslog(syslog.LOG_INFO, f"GPU-FAN-CTRL: {subject} - {message}")
 
     if is_error:
+        key = throttle_key or subject
+        interval = ERROR_MAIL_INTERVAL if throttle_seconds is None else throttle_seconds
+        if interval is None:
+            interval = 0
+        now = time.time()
+        state = ERROR_MAIL_STATE.get(key, {"last_sent": 0.0, "suppressed": 0})
+
+        if interval > 0 and (now - state["last_sent"]) < interval:
+            state["suppressed"] += 1
+            ERROR_MAIL_STATE[key] = state
+            return
+
+        mail_message = message
+        if state["suppressed"] > 0:
+            mail_message = (
+                f"{message}\n\n"
+                f"Hinweis: Seit der letzten E-Mail zu diesem Fehler wurden "
+                f"{state['suppressed']} weitere gleiche Ereignisse unterdrückt."
+            )
+
         try:
             proc = subprocess.Popen(['mail', '-s', subject, ADMIN_EMAIL], stdin=subprocess.PIPE)
-            proc.communicate(input=message.encode('utf-8'))
+            proc.communicate(input=mail_message.encode('utf-8'))
+            ERROR_MAIL_STATE[key] = {"last_sent": now, "suppressed": 0}
         except Exception as e:
             syslog.syslog(syslog.LOG_ERR, f"GPU-FAN-CTRL: Konnte Alarm-E-Mail nicht senden: {e}")
 
@@ -138,7 +162,12 @@ def get_gpu_temperatures():
                 temps[int(idx_str.strip())] = int(temp_str.strip())
         return temps
     except Exception as e:
-        log_and_mail("Fehler nvidia-smi", f"Konnte GPUs nicht auslesen: {e}", is_error=True)
+        log_and_mail(
+            "Fehler nvidia-smi",
+            f"Konnte GPUs nicht auslesen: {e}",
+            is_error=True,
+            throttle_key="nvidia-smi-error",
+        )
         return None
 
 def check_fan_rpm(ctrl, rpm_string, target_speed):
@@ -233,12 +262,22 @@ def main():
                     print(f"[{ctrl['name']}] Temp: {temp_str} -> PWM: {target_speed}% | {display_response}")
 
                     if response.startswith("TIMEOUT:"):
-                        log_and_mail(f"Arduino Timeout in {ctrl['name']}", response, is_error=True)
+                        log_and_mail(
+                            f"Arduino Timeout in {ctrl['name']}",
+                            response,
+                            is_error=True,
+                            throttle_key=f"arduino-timeout:{ctrl['name']}",
+                        )
                     elif response:
                         check_fan_rpm(ctrl, response, target_speed)
 
                 except serial.SerialException as e:
-                    log_and_mail("Verbindungsabbruch", f"Verbindung zu {ctrl['name']} während der Kommunikation abgebrochen: {e}", is_error=True)
+                    log_and_mail(
+                        "Verbindungsabbruch",
+                        f"Verbindung zu {ctrl['name']} während der Kommunikation abgebrochen: {e}",
+                        is_error=True,
+                        throttle_key=f"serial-drop:{ctrl['name']}",
+                    )
                     ctrl["connection"].close()
                     ctrl["connection"] = None
 

@@ -8,6 +8,7 @@ min_rpm_warn_threshold = 300   # RPM-Untergrenze für Lüfterausfall-Alarm
 rpm_fail_debounce      = 5.0   # Sekunden Stillstand bevor Alarm ausgelöst wird
 fallback_speed         = 40    # % Lüfterdrehzahl wenn nvidia-smi nicht verfügbar
 admin_email            = "root"
+error_mail_interval    = 86400 # Sekunden zwischen identischen Fehler-E-Mails (86400 = 24h)
 
 # PID-Standardwerte – gelten für alle Zonen, sofern dort nicht überschrieben
 [pid_defaults]
